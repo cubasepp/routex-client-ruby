@@ -5,7 +5,9 @@ require "uri"
 require_relative "errors"
 
 module Routex
-  Response = Struct.new(:status, :headers, :body, keyword_init: true)
+  # Raw HTTP result. Distinct from Routex::Response, which models a decoded
+  # service response.
+  HttpResponse = Struct.new(:status, :headers, :body, keyword_init: true)
 
   # Minimal HTTP surface. Swap in your own object responding to #execute to route
   # requests through an existing connection pool (Excon, Faraday, ...).
@@ -27,7 +29,7 @@ module Routex
                                  open_timeout: @open_timeout,
                                  read_timeout: @read_timeout) { |http| http.request(request) }
 
-      Response.new(
+      HttpResponse.new(
         status: response.code.to_i,
         headers: response.each_header.to_h,
         body: (response.body || "").b

@@ -48,11 +48,10 @@ module Routex
         response = @transport.execute(
           method: :post,
           url: join_url(@base_url, @path),
-          headers: { "Accept" => MEDIA_TYPE, "Content-Type" => "application/json" }.merge(extra_headers),
+          headers: { "accept" => MEDIA_TYPE, "content-type" => "application/json" }.merge(extra_headers),
           body: JSON.generate(publicKey: Base64.strict_encode64(@client_keys.public))
         )
-        raise ServerError.new("key settlement failed", status: response.status, body: response.body) if
-          response.status >= 400
+        raise ErrorDispatcher.dispatch(response.status, response.body) if response.status >= 400
 
         @settled = verify(response.body)
       end

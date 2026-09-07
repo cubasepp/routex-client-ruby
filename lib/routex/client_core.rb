@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "base64"
+require "securerandom"
+require_relative "errors"
 require_relative "settlement"
 require_relative "ticket"
 
@@ -11,6 +13,8 @@ module Routex
   class ClientCore
     MEDIA_TYPE = "application/vnd.yaxi.v5"
     HEADER_CLIENT_VERSION = "yaxi-client-version"
+    HEADER_ACCEPT = "accept"
+    HEADER_USER_AGENT = "user-agent"
     HEADER_TICKET_ID = "yaxi-ticket-id"
     HEADER_TICKET = "yaxi-ticket"
     HEADER_SESSION_ID = "yaxi-session-id"
@@ -29,21 +33,22 @@ module Routex
 
     def system_version_for(ticket_id) = @settlements[ticket_id]&.system_version
 
+    # A ticket-less call (public search) still needs a ticket id for routing.
     def request(ticket:, path:, body: nil)
-      ticket_id = ticket.id
+      ticket_id = ticket ? ticket.id : SecureRandom.uuid
       settlement = settlement_for(ticket_id)
       settled = settlement.settle(settlement_headers(ticket_id))
 
       headers = {
-        "User-Agent" => user_agent,
+        HEADER_USER_AGENT => user_agent,
         HEADER_CLIENT_VERSION => client_version,
         HEADER_TICKET_ID => ticket_id,
-        HEADER_TICKET => Base64.strict_encode64(seal(settlement, ticket.raw)),
         HEADER_SESSION_ID => settled.session_id,
-        "Accept" => MEDIA_TYPE
+        HEADER_ACCEPT => MEDIA_TYPE
       }
+      headers[HEADER_TICKET] = Base64.strict_encode64(seal(settlement, ticket.raw)) if ticket
       headers[HEADER_REDIRECT_URI] = @redirect_uri if @redirect_uri
-      headers["Content-Type"] = "application/json" if body
+      headers["content-type"] = "application/json" if body
 
       response = settlement.transport.execute(
         method: body ? :post : :get,
@@ -54,7 +59,7 @@ module Routex
 
       capture_trace_id(settlement, response)
       plain = unseal_best_effort(settlement, response.body, fallback: response.status >= 400)
-      raise ServerError.new("service call failed", status: response.status, body: plain) if response.status >= 400
+      raise ErrorDispatcher.dispatch(response.status, plain) if response.status >= 400
 
       plain
     end
@@ -72,10 +77,10 @@ module Routex
     end
 
     def settlement_headers(ticket_id)
-      { "User-Agent" => user_agent, HEADER_CLIENT_VERSION => client_version, HEADER_TICKET_ID => ticket_id }
+      { HEADER_USER_AGENT => user_agent, HEADER_CLIENT_VERSION => client_version, HEADER_TICKET_ID => ticket_id }
     end
 
-    def user_agent = "RoutexClient/#{Routex::VERSION} (ruby)"
+    def user_agent = "RoutexClient/#{Routex::VERSION} (Ruby)"
     def client_version = "ruby/#{Routex::VERSION}"
 
     def seal(settlement, plaintext)

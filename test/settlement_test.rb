@@ -22,7 +22,7 @@ class SettlementTest < Minitest::Test
   end
 
   def ok(body)
-    Routex::Response.new(status: 200, headers: {}, body: body)
+    Routex::HttpResponse.new(status: 200, headers: {}, body: body)
   end
 
   def settlement(transport)
@@ -37,7 +37,7 @@ class SettlementTest < Minitest::Test
     request = transport.requests.first
     assert_equal :post, request[:method]
     assert_equal "https://integration.yaxi.tech/key-settlement", request[:url]
-    assert_equal "application/vnd.yaxi.v5", request[:headers]["Accept"]
+    assert_equal "application/vnd.yaxi.v5", request[:headers]["accept"]
     assert_equal Base64.strict_encode64(subject.client_public_key), JSON.parse(request[:body])["publicKey"]
   end
 
@@ -49,10 +49,12 @@ class SettlementTest < Minitest::Test
     assert_equal "t-1", transport.requests.first[:headers]["yaxi-ticket-id"]
   end
 
-  def test_raises_a_server_error_on_a_4xx
-    transport = StubTransport.new { Routex::Response.new(status: 400, headers: {}, body: "nope") }
-    error = assert_raises(Routex::ServerError) { settlement(transport).settle }
-    assert_equal 400, error.status
+  def test_raises_a_typed_error_on_a_4xx
+    body = JSON.generate(Unauthorized: { userMessage: "bad key" })
+    transport = StubTransport.new { Routex::HttpResponse.new(status: 401, headers: {}, body: body) }
+    error = assert_raises(Routex::UnauthorizedError) { settlement(transport).settle }
+    assert_equal 401, error.status
+    assert_equal "bad key", error.user_message
   end
 
   def test_rejects_a_non_json_body

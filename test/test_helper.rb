@@ -2,6 +2,8 @@
 
 require "minitest/autorun"
 require "base64"
+require "date"
+require "json"
 require "routex"
 
 module TestHelpers

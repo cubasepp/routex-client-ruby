@@ -58,10 +58,6 @@ crypto primitives against BouncyCastle and running them on fixed inputs.
   verification is now covered offline (see above), but the request/response cycle
   against `integration.yaxi.tech` -- and therefore every service call -- is
   unexercised. That still needs credentials.
-- **Amount handling.** Upstream preserves decimal scale on the wire
-  (`"100.00"` stays `"100.00"`). Ruby's `BigDecimal` can do this but the
-  serialisation is not wired up.
-
 ## Other official clients
 
 YAXI publishes more ports than the Kotlin one, and they matter for the work left:
@@ -83,7 +79,16 @@ this port is missing, in a form that translates to Ruby far more directly than
 Kotlin's 3,400 lines of typed serialisers. Its `tests/` are the source of the
 attestation fixtures used here.
 
-Port the remaining model layer from the Lua client, not from Kotlin.
+The model layer here was ported from the Lua client, and doing so corrected
+three things that had been guessed from the Kotlin source:
+
+- `Result`'s payload is a positional array `[jwt, session, connectionData]`, not
+  an object with an `authenticated.jwt` field.
+- `Dialog.context` is the dialog's *category* (`Sca`, `Accounts`, ...). The
+  continuation token lives on `Dialog.input.<variant>.context`, Base64-encoded.
+  Reading the wrong one breaks the interrupt loop on the first round.
+- The confirm endpoint is `<service>/confirmation`, not `<service>/context`, and
+  `registerRedirectUri` posts to `redirects` and reads back `redirectUrl`.
 
 ## The maintenance problem
 

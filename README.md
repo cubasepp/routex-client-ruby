@@ -57,24 +57,49 @@ client = Routex::Client.new(base_url: Routex::Client::INTEGRATION_URL)
 
 response = client.accounts(
   ticket,
-  credentials: { connectionId: connection_id, userId: "user" },
+  credentials: { connection_id: connection_id, user_id: "user" },
   fields: %w[iban currency ownerName]
 )
 
 until response.result?
   response =
-    case response.variant
-    when "Dialog"         then client.respond_accounts(ticket, response.context, user_input)
-    when "Redirect"       then client.confirm_accounts(ticket, response.context)
-    when "RedirectHandle" then client.confirm_accounts(ticket, response.context)
+    case response
+    when Routex::Dialog
+      # response.context is the dialog's category (Sca, Accounts, ...).
+      # The continuation token is response.input_context.
+      if response.confirmation?
+        client.confirm_accounts(ticket, response.input_context)
+      else
+        client.respond_accounts(ticket, response.input_context, answer_from_user)
+      end
+    when Routex::Redirect
+      send_user_to(response.url)
+      client.confirm_accounts(ticket, response.context)
+    when Routex::RedirectHandle
+      url = client.register_redirect_uri(ticket, response.handle, "myapp://callback")
+      send_user_to(url)
+      client.confirm_accounts(ticket, response.context)
     end
 end
 
-response.jwt   # authenticated data, signed; verify it in a trusted environment
+response.jwt              # authenticated data, signed; verify before acting on it
+response.session          # short-lived, pass to the next call to skip re-authentication
+response.connection_data  # persist to reuse the consent later
 ```
 
-The interrupt loop mirrors the Kotlin client's `when` block: repeat until a
-`Result` comes back.
+A `Dialog` is one of three shapes, and `#input` tells you which:
+
+| Predicate | `#input` | What to do |
+|---|---|---|
+| `confirmation?` | `context`, `polling_delay_secs` | confirm to proceed (decoupled SCA, or poll after the delay) |
+| `selection?` | `options`, `context` | let the user pick one, respond with its `key` |
+| `field?` | `type`, `secrecy_level`, `min_length`, `max_length` | collect text, mask it when `masked?` |
+
+Service errors are typed: `Routex::InvalidCredentialsError`,
+`Routex::ServiceBlockedError`, `Routex::TicketError` and the rest all descend
+from `Routex::ServiceError` and carry `#code`, `#user_message` and `#status`.
+Attestation failures descend from `Routex::AttestationError` instead -- they mean
+the TEE could not be verified, and are never a normal control-flow condition.
 
 ## Running the tests
 
