@@ -17,8 +17,10 @@ require_relative "routex/settlement"
 require_relative "routex/client_core"
 require_relative "routex/ticket"
 require_relative "routex/ticket_issuer"
+require_relative "routex/discovery"
 require_relative "routex/response"
 require_relative "routex/client"
+require_relative "routex/refresh_client"
 
 module Routex
 end

@@ -53,7 +53,6 @@ crypto primitives against BouncyCastle and running them on fixed inputs.
 - **`ServiceResponse` is a thin wrapper over decoded JSON**, not the typed
   `Response.Dialog` / `Response.Result` hierarchy. `#context` in particular
   guesses at two shapes and needs pinning against real payloads.
-- **`RefreshClient`** (non-interactive backend refreshes) is not ported at all.
 - **No call against a live endpoint has run.** The settlement *response*
   verification is now covered offline (see above), but the request/response cycle
   against `integration.yaxi.tech` -- and therefore every service call -- is

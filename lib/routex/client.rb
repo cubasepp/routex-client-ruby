@@ -3,6 +3,7 @@
 require "base64"
 require "json"
 require_relative "client_core"
+require_relative "discovery"
 require_relative "response"
 require_relative "settlement"
 require_relative "transport"
@@ -34,6 +35,8 @@ module Routex
   #       end
   #   end
   class Client
+    include Discovery
+
     PRODUCTION_URL = "https://api.yaxi.tech"
     INTEGRATION_URL = "https://integration.yaxi.tech"
 
@@ -76,9 +79,6 @@ module Routex
     def redirect_uri=(uri)
       @core.redirect_uri = uri
     end
-
-    def trace_id = @core.trace_id
-    def system_version_for(ticket_id) = @core.system_version_for(ticket_id)
 
     SERVICE_PATHS.each do |name, path|
       # Answer a Dialog that asked for input (a TAN, a selected option's key).
@@ -127,28 +127,11 @@ module Routex
                         details: details))
     end
 
-    # Search the connection directory. Works without a ticket, in which case a
-    # random ticket id is sent so the request can still be routed.
-    def search(ticket = nil, filters: [], iban_detection: false, limit: nil, details: nil)
-      body = compact(ibanDetection: iban_detection, filters: filters, limit: limit, details: details)
-      JSON.parse(@core.request(ticket: ticket, path: "search", body: JSON.generate(body)))
-    end
-
-    def info(ticket, connection_id)
-      JSON.parse(@core.request(ticket: ticket, path: "info/#{connection_id}"))
-    end
-
     # Exchange a RedirectHandle for the URL to send the user to.
     def register_redirect_uri(ticket, handle, redirect_uri)
       body = JSON.generate(handle: handle, redirectUri: redirect_uri)
       json = JSON.parse(@core.request(ticket: ticket, path: "redirects", body: body))
       json["redirectUrl"] or raise ResponseError, "expected redirectUrl in response"
-    end
-
-    def trace(ticket, trace_id)
-      sealed = @core.seal_payload(ticket.id, trace_id)
-      path = "traces/#{Base64.urlsafe_encode64(sealed, padding: false)}"
-      JSON.parse(@core.request(ticket: ticket, path: path))
     end
 
     private

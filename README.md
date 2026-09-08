@@ -101,6 +101,31 @@ from `Routex::ServiceError` and carry `#code`, `#user_message` and `#status`.
 Attestation failures descend from `Routex::AttestationError` instead -- they mean
 the TEE could not be verified, and are never a normal control-flow condition.
 
+## Refreshing without the user
+
+Once a connection has been through an interactive consent, `RefreshClient`
+updates its data from a backend with nobody present. It returns the payload
+directly -- no JWT envelope, no interrupts to loop over.
+
+```ruby
+refresh = Routex::RefreshClient.new(base_url: Routex::RefreshClient::INTEGRATION_URL)
+
+# Banks cap requests made without a user present. Declaring one lifts the cap.
+refresh.user_in_session = Routex::RefreshClient::UserInSession::ON_THIS_CONNECTION
+# ...or, when you are proxying for a user you can see:
+# refresh.user_in_session = Routex::RefreshClient::UserInSession.at(request.remote_ip)
+
+response = refresh.accounts(ticket, connection_data: stored_connection_data)
+response.result             # the accounts payload, decoded
+
+# Connection data and session can be rotated by the service. Persist them.
+stored_connection_data = response.connection_data || stored_connection_data
+```
+
+`accounts`, `balances` and `transactions` are the whole surface; payments and
+transfers are inherently interactive and stay on `Routex::Client`. Both clients
+also expose `search`, `info` and `trace`.
+
 ## Running the tests
 
 ```
