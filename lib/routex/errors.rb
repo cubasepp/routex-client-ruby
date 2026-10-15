@@ -94,7 +94,9 @@ module Routex
 
       variant, payload = error_variant(decoded)
       unless variant
-        return ResponseError.new("service returned HTTP #{status}", status: status, body: body)
+        message = "service returned HTTP #{status}"
+        message = "#{message}: #{body}" unless body.to_s.strip.empty?
+        return ResponseError.new(message, status: status, body: body)
       end
 
       build(variant, payload, status, body)

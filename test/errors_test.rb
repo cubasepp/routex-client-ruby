@@ -87,6 +87,11 @@ class ErrorDispatcherTest < Minitest::Test
     assert_kind_of Routex::ResponseError, error
     assert_equal 500, error.status
     assert_equal "<html>gateway</html>", error.body
+    assert_equal "service returned HTTP 500: <html>gateway</html>", error.message
+  end
+
+  def test_an_empty_body_leaves_the_message_at_the_status
+    assert_equal "service returned HTTP 502", Routex::ErrorDispatcher.dispatch(502, "").message
   end
 
   def test_an_unknown_variant_becomes_a_response_error
